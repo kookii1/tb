@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>O Tempo e o Vento: o jogo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Alegreya:ital,wght@0,400;0,500;0,700;0,800;1,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #eff1ec;
+    --surface: #fafaf6;
+    --ink: #1d292c;
+    --muted: #55656a;
+    --line: #c9d0ca;
+    --accent: #a3302a;
+    --accent-ink: #ffffff;
+    --ok: #2c6a3a;
+    --ok-bg: #e0efe3;
+    --bad: #a3302a;
+    --bad-bg: #f6e2e0;
+    --flame: #e0951f;
+    --flame-core: #fbe29a;
+
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg: #121719;
+      --surface: #1a2124;
+      --ink: #e8ebe6;
+      --muted: #9dabac;
+      --line: #2f3b3e;
+      --accent: #e5726a;
+      --accent-ink: #1b1010;
+      --ok: #84cc90;
+      --ok-bg: #1c2e21;
+      --bad: #f09088;
+      --bad-bg: #35201f;
+      --flame: #f2b44d;
+      --flame-core: #fff0b8;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #121719;
+    --surface: #1a2124;
+    --ink: #e8ebe6;
+    --muted: #9dabac;
+    --line: #2f3b3e;
+    --accent: #e5726a;
+    --accent-ink: #1b1010;
+    --ok: #84cc90;
+    --ok-bg: #1c2e21;
+    --bad: #f09088;
+    --bad-bg: #35201f;
+    --flame: #f2b44d;
+    --flame-core: #fff0b8;
+  }
+
+  html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+  *, *::before, *::after { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Alegreya", Georgia, "Times New Roman", serif;
+    font-size: 1.2rem;
+    line-height: 1.55;
+    min-height: 100%;
+  }
+
+  .wrap {
+    max-width: 40rem;
+    margin: 0 auto;
+    padding: 2.5rem 1.25rem 3rem;
+  }
+
+  h1, h2, p { margin: 0; }
+  h1 {
+    font-size: clamp(2.5rem, 9vw, 3.75rem);
+    font-weight: 800;
+    line-height: 1.02;
+    letter-spacing: -0.01em;
+  }
+  h2 {
+    font-size: clamp(1.45rem, 4.6vw, 1.75rem);
+    font-weight: 700;
+    line-height: 1.25;
+  }
+  h1:focus, h2:focus { outline: none; }
+  .muted { color: var(--muted); }
+
+  /* ---------- Velas ---------- */
+  .lamps { display: inline-flex; gap: 0.5rem; align-items: flex-end; }
+  .lamp { width: 26px; height: 36px; color: var(--ink); overflow: visible; }
+  .lamp .body { fill: var(--surface); stroke: currentColor; stroke-width: 1.6; }
+  .lamp .wick { stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; fill: none; }
+  .lamp .smoke { stroke: var(--muted); stroke-width: 1.3; stroke-linecap: round; fill: none; opacity: 0; transition: opacity 0.6s ease 0.2s; }
+  .lamp .flame { transform-box: fill-box; transform-origin: 50% 100%; transition: opacity 0.45s ease, transform 0.45s ease; }
+  .lamp .flick { transform-box: fill-box; transform-origin: 50% 100%; animation: flicker 2.6s ease-in-out infinite; }
+  .lamp:nth-child(2) .flick { animation-delay: -0.9s; }
+  .lamp:nth-child(3) .flick { animation-delay: -1.7s; }
+  .lamp .outer { fill: var(--flame); }
+  .lamp .inner { fill: var(--flame-core); }
+  .lamp.off .flame { opacity: 0; transform: translateY(-4px) scale(0.5); }
+  .lamp.off .smoke { opacity: 0.8; }
+  @keyframes flicker {
+    0%, 100% { transform: scale(1, 1) rotate(0deg); }
+    30% { transform: scale(0.96, 1.05) rotate(-2deg); }
+    60% { transform: scale(1.03, 0.96) rotate(1.5deg); }
+  }
+  .hero .lamp { width: 44px; height: 60px; }
+  .hero .lamps { gap: 1rem; }
+
+  /* ---------- Início ---------- */
+  .hero > * + * { margin-top: 1.25rem; }
+  .hero .lead { font-size: 1.35rem; line-height: 1.4; }
+  .hero .rules { max-width: 34rem; }
+
+  .btn {
+    font: inherit;
+    font-weight: 700;
+    background: var(--accent);
+    color: var(--accent-ink);
+    border: 0;
+    border-radius: 6px;
+    padding: 0.7em 1.5em;
+    cursor: pointer;
+  }
+  .btn:hover { filter: brightness(1.1); }
+  .btn:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
+
+  /* ---------- Jogo ---------- */
+  .status {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 1rem;
+  }
+  .status .count { font-weight: 700; line-height: 1.2; }
+  .status .hits { font-size: 0.95rem; color: var(--muted); }
+  .bar { height: 6px; background: var(--line); border-radius: 3px; margin: 0.75rem 0 1.75rem; overflow: hidden; }
+  .bar > div { height: 100%; width: 0; background: var(--accent); transition: width 0.4s ease; }
+
+  .options { display: grid; gap: 0.65rem; margin-top: 1.5rem; }
+  .opt {
+    display: grid;
+    grid-template-columns: 1.5em 1fr;
+    gap: 0.5em;
+    align-items: start;
+    width: 100%;
+    text-align: left;
+    font: inherit;
+    line-height: 1.35;
+    color: var(--ink);
+    background: var(--surface);
+    border: 1.5px solid var(--line);
+    border-radius: 6px;
+    padding: 0.75em 0.9em;
+    cursor: pointer;
+  }
+  .opt .key { color: var(--muted); font-weight: 700; }
+  .opt .tag { display: block; font-size: 0.88em; font-weight: 700; margin-top: 0.15em; }
+  .opt:hover:not(:disabled) { border-color: var(--accent); }
+  .opt:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
+  .opt:disabled { cursor: default; opacity: 1; color: var(--ink); }
+  .opt.dim { color: var(--muted); }
+  .opt.right { border-color: var(--ok); background: var(--ok-bg); }
+  .opt.right .tag { color: var(--ok); }
+  .opt.wrong { border-color: var(--bad); background: var(--bad-bg); }
+  .opt.wrong .tag { color: var(--bad); }
+
+  .feedback {
+    margin-top: 1.5rem;
+    padding: 0.2rem 0 0.2rem 1rem;
+    border-left: 4px solid var(--accent);
+  }
+  .feedback .title { font-weight: 800; font-size: 1.2rem; }
+  .feedback .text { margin-top: 0.35rem; }
+  .feedback .btn { margin-top: 1rem; }
+
+  .kbd-hint { margin-top: 1.5rem; font-size: 0.95rem; color: var(--muted); }
+  @media (hover: none) { .kbd-hint { display: none; } }
+
+  /* ---------- Fim ---------- */
+  .end > * + * { margin-top: 1.1rem; }
+  .end .rank { font-size: 2rem; font-weight: 800; line-height: 1.1; color: var(--accent); }
+  .end .btn { margin-top: 1.5rem; }
+
+  footer { margin-top: 3rem; font-size: 0.9rem; color: var(--muted); }
+
+  .sr {
+    position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+    overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .lamp .flick { animation: none; }
+    .lamp .flame, .lamp .smoke, .bar > div { transition-duration: 0.01ms; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- Tela inicial -->
+  <section id="start" class="hero" aria-labelledby="startTitle">
+    <h1 id="startTitle">O Tempo e o Vento</h1>
+    <p class="lead">Teste o quanto você conhece a saga gaúcha de Erico Verissimo.</p>
+    <div id="startLamps" class="lamps" role="img" aria-label="Três velas acesas"></div>
+    <p class="rules">São 10 perguntas sorteadas. Cada erro faz o minuano apagar uma das três velas. Se as três se apagarem, o jogo termina.</p>
+    <p id="bestStart" class="muted" hidden></p>
+    <button id="startBtn" class="btn" type="button">Começar</button>
+  </section>
+
+  <!-- Tela do jogo -->
+  <section id="game" hidden aria-label="Jogo">
+    <div class="status">
+      <div>
+        <div id="qCount" class="count"></div>
+        <div id="qHits" class="hits"></div>
+      </div>
+      <div id="gameLamps" class="lamps" role="img"></div>
+    </div>
+    <div class="bar" aria-hidden="true"><div id="barFill"></div></div>
+
+    <h2 id="qText" tabindex="-1"></h2>
+    <div id="options" class="options" role="group" aria-labelledby="qText"></div>
+
+    <div id="feedback" class="feedback" hidden>
+      <p id="fbTitle" class="title"></p>
+      <p id="fbText" class="text"></p>
+      <button id="nextBtn" class="btn" type="button">Próxima pergunta</button>
+    </div>
+
+    <p class="kbd-hint">Dica: no teclado, use as teclas 1 a 4 para responder.</p>
+  </section>
+
+  <!-- Tela final -->
+  <section id="end" class="end" hidden aria-labelledby="endTitle">
+    <h2 id="endTitle" tabindex="-1"></h2>
+    <p id="endRank" class="rank"></p>
+    <p id="endScore"></p>
+    <p id="endBlurb"></p>
+    <p id="endBest" class="muted"></p>
+    <button id="againBtn" class="btn" type="button">Jogar de novo</button>
+  </section>
+
+  <footer>Jogo de perguntas inspirado na obra de Erico Verissimo (1905–1975).</footer>
+  <p id="sr" class="sr" aria-live="polite"></p>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var TOTAL = 10;
+  var MAX_LIVES = 3;
+  var BEST_KEY = "tempo-vento-melhor";
+
+  // a = resposta certa, w = respostas erradas, e = explicação
+  var QUESTIONS = [
+    {
+      q: "Quem escreveu a saga O Tempo e o Vento?",
+      a: "Erico Verissimo",
+      w: ["Jorge Amado", "Simões Lopes Neto", "Mario Quintana"],
+      e: "Erico Verissimo publicou a saga entre 1949 e 1962. A obra ganhou adaptações para a televisão e para o cinema."
+    },
+    {
+      q: "Em que estado brasileiro se passa a história?",
+      a: "Rio Grande do Sul",
+      w: ["Santa Catarina", "Paraná", "Mato Grosso do Sul"],
+      e: "A saga acompanha a formação do Rio Grande do Sul, com suas guerras de fronteira, estâncias e cidades."
+    },
+    {
+      q: "Qual é o nome da cidade fictícia onde acontece grande parte da trama?",
+      a: "Santa Fé",
+      w: ["Santa Maria", "Cruz Alta", "Bagé"],
+      e: "Santa Fé foi inventada pelo autor, mas se inspira em Cruz Alta, a cidade onde ele nasceu."
+    },
+    {
+      q: "Que período de tempo a saga percorre?",
+      a: "De 1745 a 1945",
+      w: ["De 1500 a 1700", "De 1822 a 1922", "De 1889 a 1989"],
+      e: "São duzentos anos de história, vistos pelas gerações de algumas famílias de Santa Fé."
+    },
+    {
+      q: "Quais são as três partes da saga?",
+      a: "O Continente, O Retrato e O Arquipélago",
+      w: [
+        "O Continente, O Pampa e O Minuano",
+        "O Sobrado, O Retrato e O Arquipélago",
+        "O Tempo, O Vento e O Retrato"
+      ],
+      e: "O Continente abre a saga, O Retrato dá sequência e O Arquipélago a encerra."
+    },
+    {
+      q: "Quais são as duas famílias cujas histórias se cruzam ao longo da saga?",
+      a: "Terra Cambará e Amaral",
+      w: ["Menezes e Albuquerque", "Silva e Pereira", "Fagundes e Bittencourt"],
+      e: "Os Terra Cambará e os Amaral disputam poder e prestígio em Santa Fé por várias gerações."
+    },
+    {
+      q: "Qual é o nome do vento frio e seco do inverno gaúcho que sopra ao longo da narrativa?",
+      a: "Minuano",
+      w: ["Mistral", "Siroco", "Zonda"],
+      e: "O vento é uma presença constante na história e, junto com o tempo, dá nome à obra."
+    },
+    {
+      q: "Como se chama a grande casa da família Cambará em Santa Fé?",
+      a: "O Sobrado",
+      w: ["A Estância do Mirante", "O Solar dos Amaral", "A Casa Verde"],
+      e: "O Sobrado é palco de boa parte da trama e testemunha a passagem de várias gerações."
+    },
+    {
+      q: "Como o Capitão Rodrigo Cambará chega a Santa Fé?",
+      a: "Como um forasteiro aventureiro, valente e namorador",
+      w: [
+        "Como um padre enviado pela Igreja",
+        "Como um juiz mandado pela Corte",
+        "Como um comerciante tímido e endividado"
+      ],
+      e: "Rodrigo chega de fora e logo desperta admiração, paixões e inimizades na cidade."
+    },
+    {
+      q: "Com quem o Capitão Rodrigo Cambará se casa?",
+      a: "Bibiana Terra",
+      w: ["Ana Terra", "Flora Cambará", "Anita Garibaldi"],
+      e: "Bibiana Terra e Rodrigo formam a família Terra Cambará, que acompanha a saga até o fim."
+    },
+    {
+      q: "Qual é o parentesco entre Ana Terra e Bibiana?",
+      a: "Avó e neta",
+      w: ["Mãe e filha", "Irmãs", "Tia e sobrinha"],
+      e: "Ana Terra é avó de Bibiana. As duas mulheres ligam gerações diferentes da mesma família."
+    },
+    {
+      q: "Quem é Pedro Missioneiro, personagem ligado à história de Ana Terra?",
+      a: "Um jovem de origem indígena, vindo das antigas Missões",
+      w: ["Um soldado espanhol", "Um padre jesuíta", "Um tropeiro paulista"],
+      e: "O nome indica a origem: as antigas Missões jesuíticas. Ele tem papel central na história de Ana Terra."
+    },
+    {
+      q: "Que revolta gaúcha, iniciada em 1835, aparece na saga?",
+      a: "A Revolução Farroupilha",
+      w: ["A Guerra de Canudos", "A Cabanagem", "A Balaiada"],
+      e: "A Farroupilha, também chamada de Guerra dos Farrapos, durou dez anos (1835 a 1845) e aparece em O Continente."
+    },
+    {
+      q: "Qual é a profissão do Dr. Rodrigo Cambará, figura central de O Retrato?",
+      a: "Médico",
+      w: ["Advogado", "Engenheiro", "Padre"],
+      e: "Rodrigo, descendente do Capitão de mesmo nome, estuda medicina e volta para Santa Fé."
+    },
+    {
+      q: "Qual atividade econômica marca o mundo de estâncias e peões retratado na saga?",
+      a: "A pecuária, com a criação de gado",
+      w: ["A mineração de ouro", "O cultivo de café", "A extração de borracha"],
+      e: "Estâncias, gado e cavalaria dão o tom da vida na fronteira gaúcha."
+    },
+    {
+      q: "O título da primeira parte, O Continente, faz referência a quê?",
+      a: "Ao Continente de São Pedro, nome colonial do Rio Grande do Sul",
+      w: [
+        "Ao continente americano como um todo",
+        "Ao continente europeu, de onde vieram os colonos",
+        "A uma grande ilha ao sul do Brasil"
+      ],
+      e: "Na época colonial, o território gaúcho era chamado de Continente de São Pedro."
+    }
+  ];
+
+  var RANKS = [
+    { min: 10, title: "Guardião do Sobrado", blurb: "Gabarito perfeito. Você guarda a memória da família Terra Cambará." },
+    { min: 8, title: "Capitão de Santa Fé", blurb: "Você conhece bem a saga e os nomes que a movem." },
+    { min: 5, title: "Morador de Santa Fé", blurb: "Você já conhece as ruas da cidade e muitas das histórias que correm por ela." },
+    { min: 0, title: "Forasteiro", blurb: "Você acabou de chegar a Santa Fé. Leia a saga e volte para outra rodada." }
+  ];
+
+  function $(id) { return document.getElementById(id); }
+
+  var screens = { start: $("start"), game: $("game"), end: $("end") };
+  var current = "start";
+  var state = null;
+
+  // ---------- utilidades ----------
+  function shuffle(arr) {
+    for (var i = arr.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var t = arr[i]; arr[i] = arr[j]; arr[j] = t;
+    }
+    return arr;
+  }
+
+  function loadBest() {
+    try {
+      var v = parseInt(window.localStorage.getItem(BEST_KEY), 10);
+      return isNaN(v) ? null : v;
+    } catch (e) { return null; }
+  }
+  function saveBest(v) {
+    try { window.localStorage.setItem(BEST_KEY, String(v)); } catch (e) { /* sem armazenamento: segue o jogo */ }
+  }
+
+  function hitsText(n) { return n === 1 ? "1 acerto" : n + " acertos"; }
+
+  function show(name) {
+    current = name;
+    for (var k in screens) {
+      if (Object.prototype.hasOwnProperty.call(screens, k)) screens[k].hidden = (k !== name);
+    }
+    window.scrollTo(0, 0);
+  }
+
+  function announce(text) {
+    var sr = $("sr");
+    sr.textContent = "";
+    window.setTimeout(function () { sr.textContent = text; }, 30);
+  }
+
+  // ---------- velas ----------
+  var LAMP_SVG =
+    '<svg class="lamp" viewBox="0 0 32 44" aria-hidden="true" focusable="false">' +
+      '<path class="smoke" d="M16 21 C13 17 19 14 16 10 C14 7 17 5 16 3"/>' +
+      '<g class="flame"><g class="flick">' +
+        '<path class="outer" d="M16 2 C16 2 9.5 9.5 9.5 15 a6.5 6.5 0 0 0 13 0 C22.5 9.5 16 2 16 2 Z"/>' +
+        '<path class="inner" d="M16 10 C16 10 12.8 13.4 12.8 16 a3.2 3.2 0 0 0 6.4 0 C19.2 13.4 16 10 16 10 Z"/>' +
+      '</g></g>' +
+      '<path class="wick" d="M16 21 V25"/>' +
+      '<rect class="body" x="9" y="25" width="14" height="16" rx="2"/>' +
+      '<rect class="body" x="5" y="40.5" width="22" height="2.5" rx="1.25"/>' +
+    '</svg>';
+
+  function buildLamps(el, lit) {
+    var html = "";
+    for (var i = 0; i < MAX_LIVES; i++) html += LAMP_SVG;
+    el.innerHTML = html;
+    setLamps(el, lit);
+  }
+
+  function setLamps(el, lit) {
+    var lamps = el.children;
+    for (var i = 0; i < lamps.length; i++) {
+      if (i < lit) lamps[i].classList.remove("off");
+      else lamps[i].classList.add("off");
+    }
+    el.setAttribute("aria-label", "Velas acesas: " + lit + " de " + MAX_LIVES);
+  }
+
+  // ---------- fluxo do jogo ----------
+  function startGame() {
+    state = {
+      list: shuffle(QUESTIONS.slice()).slice(0, TOTAL),
+      index: 0,
+      hits: 0,
+      lives: MAX_LIVES,
+      answered: false,
+      opts: []
+    };
+    buildLamps($("gameLamps"), MAX_LIVES);
+    show("game");
+    renderQuestion();
+  }
+
+  function renderQuestion() {
+    var item = state.list[state.index];
+    state.answered = false;
+
+    var opts = [{ t: item.a, ok: true }];
+    for (var i = 0; i < item.w.length; i++) opts.push({ t: item.w[i], ok: false });
+    state.opts = shuffle(opts);
+
+    $("qCount").textContent = "Pergunta " + (state.index + 1) + " de " + TOTAL;
+    $("qHits").textContent = hitsText(state.hits);
+    $("barFill").style.width = (state.index / TOTAL * 100) + "%";
+    $("qText").textContent = item.q;
+    $("feedback").hidden = true;
+
+    var box = $("options");
+    box.innerHTML = "";
+    state.opts.forEach(function (o, idx) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "opt";
+
+      var key = document.createElement("span");
+      key.className = "key";
+      key.setAttribute("aria-hidden", "true");
+      key.textContent = String(idx + 1);
+
+      var body = document.createElement("span");
+      var label = document.createElement("span");
+      label.className = "label";
+      label.textContent = o.t;
+      var tag = document.createElement("span");
+      tag.className = "tag";
+      tag.hidden = true;
+      body.appendChild(label);
+      body.appendChild(tag);
+
+      b.appendChild(key);
+      b.appendChild(body);
+      b.addEventListener("click", function () { choose(idx); });
+      box.appendChild(b);
+    });
+
+    $("qText").focus();
+  }
+
+  function choose(idx) {
+    if (!state || current !== "game" || state.answered) return;
+    state.answered = true;
+
+    var item = state.list[state.index];
+    var chosen = state.opts[idx];
+    var buttons = $("options").children;
+    var i, tag;
+
+    for (i = 0; i < buttons.length; i++) {
+      var o = state.opts[i];
+      var btn = buttons[i];
+      btn.disabled = true;
+      tag = btn.querySelector(".tag");
+      if (o.ok) {
+        btn.classList.add("right");
+        tag.textContent = "✓ Resposta certa";
+        tag.hidden = false;
+      } else if (i === idx) {
+        btn.classList.add("wrong");
+        tag.textContent = "✕ Sua resposta";
+        tag.hidden = false;
+      } else {
+        btn.classList.add("dim");
+      }
+    }
+
+    var title;
+    if (chosen.ok) {
+      state.hits++;
+      title = "Certo!";
+    } else {
+      state.lives--;
+      setLamps($("gameLamps"), state.lives);
+      if (state.lives === 2) title = "Errou. O minuano apagou uma vela. Restam duas.";
+      else if (state.lives === 1) title = "Errou. O minuano apagou outra vela. Resta uma.";
+      else title = "Errou. O minuano apagou a última vela.";
+    }
+
+    $("qHits").textContent = hitsText(state.hits);
+    $("barFill").style.width = ((state.index + 1) / TOTAL * 100) + "%";
+    $("fbTitle").textContent = title;
+    $("fbText").textContent = item.e;
+
+    var isLast = (state.lives === 0) || (state.index === TOTAL - 1);
+    $("nextBtn").textContent = isLast ? "Ver resultado" : "Próxima pergunta";
+    $("feedback").hidden = false;
+    $("nextBtn").focus();
+
+    announce(title + " " + item.e);
+  }
+
+  function next() {
+    if (!state || !state.answered) return;
+    if (state.lives === 0 || state.index === TOTAL - 1) {
+      endGame();
+    } else {
+      state.index++;
+      renderQuestion();
+    }
+  }
+
+  function endGame() {
+    var died = state.lives === 0;
+    var hits = state.hits;
+
+    var rank = RANKS[RANKS.length - 1];
+    for (var i = 0; i < RANKS.length; i++) {
+      if (hits >= RANKS[i].min) { rank = RANKS[i]; break; }
+    }
+
+    var best = loadBest();
+    var newRecord = best !== null && hits > best;
+    if (best === null || hits > best) {
+      saveBest(hits);
+      best = hits;
+    }
+
+    $("endTitle").textContent = died ? "O minuano apagou todas as velas." : "Você chegou ao fim da saga.";
+    $("endRank").textContent = rank.title;
+    $("endScore").textContent =
+      "Você acertou " + hits + " de " + TOTAL + " perguntas." +
+      (died ? " O jogo terminou na pergunta " + (state.index + 1) + "." : "");
+    $("endBlurb").textContent = rank.blurb;
+    $("endBest").textContent = "Melhor resultado: " + best + " de " + TOTAL + "." + (newRecord ? " Novo recorde!" : "");
+
+    show("end");
+    $("endTitle").focus();
+  }
+
+  // ---------- eventos ----------
+  $("startBtn").addEventListener("click", startGame);
+  $("againBtn").addEventListener("click", startGame);
+  $("nextBtn").addEventListener("click", next);
+
+  document.addEventListener("keydown", function (e) {
+    if (current !== "game" || !state || state.answered) return;
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    var n = parseInt(e.key, 10);
+    if (n >= 1 && n <= state.opts.length) {
+      e.preventDefault();
+      choose(n - 1);
+    }
+  });
+
+  // ---------- início ----------
+  buildLamps($("startLamps"), MAX_LIVES);
+  var best0 = loadBest();
+  if (best0 !== null) {
+    $("bestStart").textContent = "Seu melhor resultado: " + best0 + " de " + TOTAL + ".";
+    $("bestStart").hidden = false;
+  }
+})();
+</script>
+</body>
+</html>
